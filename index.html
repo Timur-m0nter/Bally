@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0f172a"><link rel="manifest" href="manifest.json"><title>Баллы и штрафы</title><style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:#0f172a;color:#e2e8f0}
+.wrap{max-width:540px;margin:auto;padding:16px}h1{font-size:22px;margin:8px 0 4px}.sub{margin:0 0 16px;color:#94a3b8;font-size:14px}
+.card{background:#1e293b;border:1px solid #334155;border-radius:16px;padding:16px;margin-bottom:14px}
+.big{font-size:36px;font-weight:800}.row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:10px 0}
+.item{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px;border-radius:12px;background:#0f172a;border:1px solid #334155;margin-bottom:8px}
+.item.done{border-color:#22c55e;background:#052e16}
+button{border:0;border-radius:10px;padding:10px 12px;font-weight:700;cursor:pointer;font-family:inherit}
+.primary{background:#22c55e;color:#052e16;width:100%;padding:14px;font-size:16px}.ghost{background:#334155;color:#e2e8f0}
+.danger{background:#7f1d1d;color:#fecaca}.active{background:#22c55e;color:#052e16}.small{font-size:12px;color:#94a3b8}
+.badge{background:#334155;padding:4px 8px;border-radius:999px;font-size:12px}
+.reward{padding:12px;border-radius:12px;border:1px solid #334155;margin:8px 0}.reward.open{border-color:#f59e0b;background:#3b2f0b}
+.reward.claimed{border-color:#22c55e;background:#052e16;opacity:.75}.penalty{padding:12px;border-radius:12px;border:1px solid #7f1d1d;background:#2a1215;margin:8px 0}
+.pts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.pts button{padding:8px 10px}
+.tabs{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}.tab{flex:1;min-width:90px}.tab.active{background:#22c55e;color:#052e16}
+input,select{font-family:inherit;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:10px;padding:8px}
+.add{display:flex;gap:8px;margin-top:10px}.add input{flex:1}.add select{width:110px}
+</style></head><body><div class="wrap"><h1>Баллы и штрафы</h1><p class="sub">Каждый пункт начисляет свои баллы сразу. Баланс не уходит в минус.</p>
+<div class="card"><div class="row"><div><div class="small">Баланс</div><div class="big" id="balance">0</div></div><div style="text-align:right"><div class="small">Серия 100%</div><div class="big" id="streak">0</div><div class="small">дней</div></div></div>
+<div class="row"><span class="badge" id="today">Сегодня: 0 / 0</span><span class="badge" id="dayStatus">День не закрыт</span></div>
+<button class="primary" id="closeDay">Закрыть день</button><button class="ghost" id="resetDay" style="width:100%;margin-top:8px">Сбросить сегодняшний день</button></div>
+<div class="tabs"><button class="ghost tab active" data-tab="items">Пункты</button><button class="ghost tab" data-tab="penalties">Штрафы</button><button class="ghost tab" data-tab="rewards">Награды</button><button class="ghost tab" data-tab="history">История</button></div>
+<div id="tab-items" class="card"><h3 style="margin:0 0 10px;font-size:16px">Пункты дня</h3><div id="items"></div>
+<div class="add"><input id="newName" placeholder="Новый пункт" maxlength="60"><select id="newType"><option value="fixed">Фиксированные баллы</option><option value="range">1–5 баллов</option></select><select id="newPoints"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select><button class="primary" style="width:auto" data-action="addItem">Добавить</button></div></div>
+<div id="tab-penalties" class="card" style="display:none"><h3 style="margin:0 0 10px;font-size:16px">Штрафы</h3><div id="penalties"></div>
+<div class="item"><div><b>Свой штраф</b><div class="small">Укажи сумму вручную</div></div><div style="display:flex;gap:6px"><input id="customAmount" type="number" inputmode="numeric" placeholder="100" style="width:80px"><button class="danger" data-action="custom">−</button></div></div></div>
+<div id="tab-rewards" class="card" style="display:none"><h3 style="margin:0 0 10px;font-size:16px">Награды</h3><div id="rewards"></div>
+<div class="add"><input id="rewardName" placeholder="Новая награда" maxlength="80"><input id="rewardNeed" type="number" inputmode="numeric" placeholder="100" style="width:100px"><button class="primary" style="width:auto" data-action="addReward">Добавить</button></div>
+<p class="small">Свои награды можно удалять кнопкой ×. Заработанные баллы при удалении не списываются.</p></div>
+<div id="tab-history" class="card" style="display:none"><h3 style="margin:0 0 10px;font-size:16px">История</h3><div id="history"></div><button class="ghost" id="resetAll">Полный сброс</button></div></div>
+<script>
+"use strict";if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js")})}
+var BASE=[{id:"wake",name:"Подъём в 6:00",min:3,max:3},{id:"shower",name:"Контрастный душ, умывание",min:3,max:3},{id:"wimhof",name:"Метод Вим Хофа",min:3,max:3},{id:"work1",name:"Работа до 11:00",min:3,max:3},{id:"lunch",name:"Правильный обед",min:1,max:1},{id:"plan",name:"План на день, сончас",min:1,max:1},{id:"training",name:"Тренировка",min:1,max:3},{id:"tasks",name:"Дела",min:1,max:5},{id:"dinner",name:"Правильный ужин",min:1,max:1},{id:"work2",name:"Работа 18:00–22:00",min:3,max:3},{id:"sleep",name:"Отбой до 23:00",min:3,max:3}];
+var BASE_REWARDS=[{name:"Выходной от работы",need:100},{name:"Свидание в термоводах + расходы по дому",need:1000},{name:"Ночь секса + свидание в термоводах",need:2000}];
+var PENALTIES=[{name:"Секс",amount:2000},{name:"Осознанный сахар",amount:500},{name:"Неосознанный сахар",amount:50},{name:"Телефон до 5 минут",amount:50},{name:"Телефон от 5 минут до часа",amount:100},{name:"Телефон больше часа",amount:500}];
+var STORAGE="points_app_v14",state=load();
+function load(){try{var x=JSON.parse(localStorage.getItem(STORAGE));if(x&&typeof x==="object")return norm(x)}catch(e){}return norm({})}
+function norm(x){x=x||{};x.total=Number(x.total)||0;x.streak=Number(x.streak)||0;x.today=x.today||{};x.history=Array.isArray(x.history)?x.history:[];x.claimed=Array.isArray(x.claimed)?x.claimed:[];x.mast=Number(x.mast)||0;x.custom=Array.isArray(x.custom)?x.custom:[];x.earned=x.earned||{};x.customRewards=Array.isArray(x.customRewards)?x.customRewards:[];return x}
+function items(){return BASE.concat(state.custom)}function rewards(){return BASE_REWARDS.concat(state.customRewards)}
+function save(){localStorage.setItem(STORAGE,JSON.stringify(state));render()}
+function val(id){return Number(state.today[id]||0)}function earned(id){return Number(state.earned[id]||0)}
+function doneCount(){return items().filter(function(it){return val(it.id)>0}).length}function allDone(){return items().length>0&&doneCount()===items().length}
+function todayKey(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function mastPen(){var n=state.mast;return n<=0?0:n===1?500:n===2?1000:n===3?1500:2000}
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
+function render(){document.getElementById("balance").textContent=state.total;document.getElementById("streak").textContent=state.streak;var all=allDone(),n=items().length;
+document.getElementById("today").textContent="Сегодня: "+doneCount()+" / "+n;var st=document.getElementById("dayStatus");st.textContent=all?"Все пункты выполнены":"День не закрыт";st.style.background=all?"#166534":"#334155";
+var h="";items().forEach(function(it){var v=val(it.id),done=v>0;h+='<div class="item'+(done?" done":"")+'"><div><b>'+esc(it.name)+'</b><div class="small">'+(it.min===it.max?it.min+" балл"+(it.min===1?"":"а"):it.min+"–"+it.max+" баллов")+" • заработано: "+earned(it.id)+'</div></div><div class="pts">';
+if(it.min===it.max)h+='<button class="ghost'+(done?" active":"")+'" data-action="toggle" data-id="'+it.id+'">'+(done?"Готово":"Отметить")+"</button>";else for(var p=it.min;p<=it.max;p++)h+='<button class="ghost'+(v===p?" active":"")+'" data-action="set" data-id="'+it.id+'" data-value="'+p+'">'+p+"</button>";
+if(it.custom)h+='<button class="danger" data-action="delItem" data-id="'+it.id+'">×</button>';h+="</div></div>"});document.getElementById("items").innerHTML=h;
+var ph="";PENALTIES.forEach(function(p){ph+='<div class="penalty"><div class="row"><div><b>'+esc(p.name)+'</b><div class="small">−'+p.amount+'</div></div><button class="danger" data-action="penalty" data-amount="'+p.amount+'" data-name="'+esc(p.name)+'">Применить</button></div></div>'});
+ph+='<div class="penalty"><div class="row"><div><b>Мастурбация</b><div class="small">Случаев: '+state.mast+' • следующий штраф: −'+mastPen()+'</div></div><button class="danger" data-action="mast">Применить</button></div></div>';document.getElementById("penalties").innerHTML=ph;
+var rh="";rewards().forEach(function(r,i){var key=r.need+":"+r.name,c=state.claimed.indexOf(key)>=0,o=state.total>=r.need&&!c;
+rh+='<div class="reward'+(c?" claimed":o?" open":"")+'"><div class="row"><div><b>'+esc(r.name)+'</b><div class="small">'+r.need+' баллов</div></div><span>'+(c?"Получено":o?"Доступно":"Ещё "+Math.max(0,r.need-state.total))+"</span></div>";
+if(o)rh+='<button class="ghost" data-action="claim" data-key="'+encodeURIComponent(key)+'">Отметить полученной</button>';
+if(i>=BASE_REWARDS.length)rh+='<button class="danger" data-action="delReward" data-index="'+i+'">×</button>';rh+="</div>"});
+document.getElementById("rewards").innerHTML=rh;
+var hh=state.history.length?"":"<p class='small'>Пока нет записей.</p>";for(var i=state.history.length-1;i>=0;i--){var x=state.history[i];hh+='<div class="item"><span>'+esc(x.date)+"</span><span>"+esc(x.label)+" • "+(x.type==="penalty"?"−":"+")+x.points+"</span></div>"}document.getElementById("history").innerHTML=hh}
+function log(l,p,t){state.history.push({date:todayKey(),label:l,points:p,type:t})}
+function setItem(id,p){var old=val(id),d=p-old;state.today[id]=p;if(d!==0){state.total=Math.max(0,state.total+d);state.earned[id]=Math.max(0,earned(id)+d);log((d>0?"+":"")+d+" за пункт",Math.abs(d),d>0?"reward":"penalty")}save()}
+document.addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;var a=b.getAttribute("data-action");
+if(a==="toggle"){var id=b.getAttribute("data-id"),it=items().find(function(x){return x.id===id});setItem(id,val(id)?0:it.min)}
+else if(a==="set")setItem(b.getAttribute("data-id"),Number(b.getAttribute("data-value")));
+else if(a==="delItem"){var did=b.getAttribute("data-id");if(confirm("Удалить пункт? Заработанные за него баллы останутся в балансе.")){delete state.today[did];state.custom=state.custom.filter(function(x){return x.id!==did});log("Удалён пункт, заработанные баллы сохранены",0,"reward");save()}}
+else if(a==="addItem"){var name=document.getElementById("newName").value.trim();if(!name)return alert("Введи название пункта.");var type=document.getElementById("newType").value,p=Number(document.getElementById("newPoints").value);var it={id:"c"+Date.now(),name:name,custom:true};if(type==="range"){it.min=1;it.max=5}else{it.min=p;it.max=p}state.custom.push(it);document.getElementById("newName").value="";save()}
+else if(a==="addReward"){var rn=document.getElementById("rewardName").value.trim(),rv=Math.abs(Number(document.getElementById("rewardNeed").value)||0);if(!rn)return alert("Введи название награды.");if(!rv)return alert("Введи количество баллов.");state.customRewards.push({name:rn,need:rv,custom:true});document.getElementById("rewardName").value="";document.getElementById("rewardNeed").value="";save()}
+else if(a==="delReward"){var ri=Number(b.getAttribute("data-index"));if(confirm("Удалить награду? Заработанные баллы останутся.")){state.customRewards.splice(ri-BASE_REWARDS.length,1);save()}}
+else if(a==="claim"){var key=decodeURIComponent(b.getAttribute("data-key"));if(state.claimed.indexOf(key)<0){state.claimed.push(key);log("Награда получена",0,"reward");save()}}
+else if(a==="penalty"){var amt=Number(b.getAttribute("data-amount")),name=b.getAttribute("data-name");state.total=Math.max(0,state.total-amt);log(name+" — штраф",amt,"penalty");save()}
+else if(a==="mast"){state.mast++;var mp=mastPen();state.total=Math.max(0,state.total-mp);log("Мастурбация, случай "+state.mast,mp,"penalty");save()}
+else if(a==="custom"){var inp=document.getElementById("customAmount"),v=Math.abs(Number(inp.value)||0);if(v>0){state.total=Math.max(0,state.total-v);log("Свой штраф",v,"penalty");inp.value="";save()}}});
+document.querySelectorAll(".tab").forEach(function(t){t.addEventListener("click",function(){document.querySelectorAll(".tab").forEach(function(x){x.classList.remove("active")});t.classList.add("active");["items","penalties","rewards","history"].forEach(function(n){document.getElementById("tab-"+n).style.display=t.getAttribute("data-tab")===n?"block":"none"})})});
+document.getElementById("closeDay").addEventListener("click",function(){var key=todayKey();if(state.history.some(function(h){return h.date===key&&h.label.indexOf("День закрыт")===0}))return alert("Сегодня уже закрыто.");
+if(allDone()){state.total+=10;state.streak++;if(state.streak%7===0)state.total+=100;if(state.streak%28===0)state.total+=1000;log("День закрыт: 100%, бонус",10,"day");state.today={};save();alert("День закрыт: +10 за 100%. Серия: "+state.streak+" дней.")}
+else{var missed=items().length-doneCount(),fine=10;state.total=Math.max(0,state.total-fine);state.streak=0;log("День закрыт без 100%, пропущено "+missed,fine,"penalty");state.today={};save();alert("День закрыт без 100%. Серия сброшена, штраф −10. Очки за отмеченные пункты уже начислены.")}});
+document.getElementById("resetDay").addEventListener("click",function(){if(confirm("Сбросить отметки за сегодня? Баллы за отмеченные сегодня пункты будут вычтены, но баланс не уйдёт ниже нуля.")){items().forEach(function(it){var v=val(it.id);if(v>0){state.total=Math.max(0,state.total-v);state.earned[it.id]=Math.max(0,earned(it.id)-v)}});state.today={};save()}});
+document.getElementById("resetAll").addEventListener("click",function(){if(confirm("Удалить все баллы, серию, свои пункты, награды, штрафы и историю?")){state=norm({});save()}});render();
+</script></body></html>
